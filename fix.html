@@ -2313,4 +2313,89 @@
     });
   </script>
 </body>
+    <!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
+<script>
+  // === שלב 1: הגדרת Firebase (החלף עם הפרטים שלך!) ===
+ const firebaseConfig = {
+  apiKey: "AIzaSyDWfur_wom5sY26FEyj6MXpKe-C1RCxZy4",
+  authDomain: "mfix1-1243b.firebaseapp.com",
+  projectId: "mfix1-1243b",
+  storageBucket: "mfix1-1243b.firebasestorage.app",
+  messagingSenderId: "873918732537",
+  appId: "1:873918732537:web:48b0568eb00034d908ea28"
+};
+
+  // אתחול Firebase
+  firebase.initializeApp(firebaseConfig);
+  const database = firebase.database();
+
+  // === שלב 2: הפונקציה לשמירת טופס ב-Firebase ===
+  function saveFormToFirebase(formData) {
+    // הוספת חותמת זמן מדויקת מהשרת
+    formData.timestamp = firebase.database.ServerValue.TIMESTAMP;
+
+    // שמירה ב-Firebase תחת הנתיב 'repairForms'
+    database.ref('repairForms').push(formData)
+      .then(() => {
+        console.log('✅ טופס נשמר בהצלחה ב-Firebase');
+      })
+      .catch(error => {
+        console.error('❌ שגיאה בשמירת טופס ב-Firebase:', error);
+      });
+  }
+
+  // === שלב 3: חטיפה (override) של פונקציית השמירה הקיימת ===
+  // נניח שהפונקציה המקורית נקראת `saveForm` או `saveRepair`
+  // אם לא – נגלה אותה לפי התנהגות (למשל: שמירה ב-localStorage)
+
+  // שמר את הפונקציה המקורית
+  const originalSaveFunction = window.saveForm || window.saveRepair || 
+                               (localStorage.setItem && function(){}); // fallback
+
+  // אם הקוד המקורי משתמש ישירות ב-localStorage.setItem – נחטוף את זה
+  const originalSetItem = localStorage.setItem;
+  localStorage.setItem = function(key, value) {
+    // שמור תחילה כמו תמיד
+    originalSetItem.apply(this, arguments);
+
+    // אם זה שמירת טופס תיקון (נזהה לפי שם המפתח)
+    if (key === 'repairForms' || key.startsWith('form_') || key.includes('repair')) {
+      try {
+        const data = JSON.parse(value);
+        // אם זה מערך – נשמור כל פריט חדש
+        if (Array.isArray(data)) {
+          // השווה לגירסה הקודמת כדי לזהות פריטים חדשים
+          const oldData = JSON.parse(localStorage.getItem(key) || '[]');
+          const newItems = data.filter(item => 
+            !oldData.some(old => old.id === item.id || JSON.stringify(old) === JSON.stringify(item))
+          );
+          newItems.forEach(item => saveFormToFirebase(item));
+        } else {
+          // אם זה פריט בודד
+          saveFormToFirebase(data);
+        }
+      } catch (e) {
+        console.warn('לא ניתן לנתח את הנתונים לשמירה ב-Firebase', e);
+      }
+    }
+  };
+
+  // === שלב 4: טעינה מ-Firebase (אופציונלי – רק אם רוצים לראות גם מהרשת) ===
+  // לא מחייב, אבל מומלץ בעתיד
+  window.loadFormsFromFirebase = function(callback = console.log) {
+    database.ref('repairForms').once('value')
+      .then(snapshot => {
+        const forms = [];
+        snapshot.forEach(child => {
+          forms.push({ id: child.key, ...child.val() });
+        });
+        callback(forms);
+      });
+  };
+
+  console.log('🔌 Firebase מחובר – כל טופס חדש יישמר גם בענן.');
+</script>
 </html>
