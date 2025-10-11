@@ -670,15 +670,15 @@
           </div>
 
           <div class="form-group">
-            <label for="estimatedTime"><i class="fas fa-clock"></i> זמן תיקון משוער:</label>
-            <select id="estimatedTime">
-              <option value="">בחר זמן משוער</option>
-              <option value="1-2">1-2 ימים</option>
-              <option value="3-5">3-5 ימים</option>
-              <option value="1week">עד שבוע</option>
-              <option value="2weeks">עד שבועיים</option>
-              <option value="unknown">לא ידוע</option>
-            </select>
+           <select id="estimatedTime">
+  <option value="">בחר זמן משוער</option>
+  <option value="1hour">עד שעה</option>
+  <option value="2hours">עד שעתיים</option>
+  <option value="3hours">עד 3 שעות</option>
+  <option value="1-2">1-2 ימים</option>
+  <option value="3-5">3-5 ימים</option>
+  <option value="update">עידכון לקוח</option>
+</select>
           </div>
         </div>
 
@@ -1392,14 +1392,14 @@
         'smartwatch': 'שעון חכם',
         'other': 'אחר'
       };
-      
       const estimatedTimeText = {
-        '1-2': '1-2 ימים',
-        '3-5': '3-5 ימים',
-        '1hour': 'עד שעה',
-        '2hour': 'עד שלוש שעות',
-        'unknown': 'לא ידוע'
-      };
+  '1hour': 'עד שעה',
+  '2hours': 'עד שעתיים',
+  '3hours': 'עד 3 שעות',
+  '1-2': '1-2 ימים',
+  '3-5': '3-5 ימים',
+  'update': 'עידכון לקוח'
+};
       
       return `
         <h3>טופס תיקון - Mfix</h3>
