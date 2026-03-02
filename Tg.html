@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>M&M Cloud Backup - AI Ultimate V3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- PhotoSwipe v5 -->
+    <link rel="stylesheet" href="https://unpkg.com/photoswipe@5.4.3/dist/photoswipe.css">
+    <script type="importmap">
+        {
+          "imports": {
+            "@google/genai": "https://esm.run/@google/genai",
+            "photoswipe": "https://unpkg.com/photoswipe@5.4.3/dist/photoswipe.esm.js",
+            "photoswipe-lightbox": "https://unpkg.com/photoswipe@5.4.3/dist/photoswipe-lightbox.esm.js"
+          }
+        }
+    </script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: { colors: { primary: '#1a73e8', secure: '#10b981', fav: '#f59e0b' } } }
+        }
+    </script>
+    <style>
+        :root { --bg: #ffffff; --text: #3c4043; --card: #f8f9fa; }
+        .dark { --bg: #000000; --text: #e8eaed; --card: #121212; }
+        body { background-color: var(--bg); color: var(--text); font-family: 'Assistant', sans-serif; transition: all 0.3s; overflow-x: hidden; }
+        
+        .tab-content { display: none; animation: slideUp 0.4s ease; }
+        .tab-content.active { display: block; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .media-grid { display: grid; gap: 2px; padding: 2px; }
+        .media-item { aspect-ratio: 1/1; position: relative; overflow: hidden; background: var(--card); cursor: pointer; transition: all 0.2s; }
+        .media-item.selected { transform: scale(0.85); border: 4px solid var(--primary); border-radius: 20px; z-index: 10; }
+        .media-item img, .media-item video { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+        
+        /* PhotoSwipe Full Screen Fixes */
+        .pswp__img { object-fit: contain !important; }
+        .pswp__video-container { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: black; }
+        .pswp__video-container video { max-width: 100%; max-height: 100%; width: auto; height: auto; }
+        
+        .selection-check { position: absolute; top: 10px; right: 10px; width: 24px; height: 24px; background: var(--primary); border-radius: 50%; display: none; align-items: center; justify-content: center; color: white; border: 2px solid white; z-index: 20; }
+        .selected .selection-check { display: flex; }
+        
+        .floating-bar { position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%); z-index: 60; display: none; gap: 20px; padding: 16px 32px; border-radius: 40px; background: var(--primary); color: white; box-shadow: 0 15px 40px rgba(26, 115, 232, 0.4); }
+        .floating-bar.active { display: flex; }
+        
+        .lock-screen { position: fixed; inset: 0; background: var(--bg); z-index: 3000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .keypad-btn { width: 70px; height: 70px; border-radius: 50%; background: var(--card); display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .keypad-btn:active { background: var(--primary); color: white; transform: scale(0.9); }
+        
+        .toast { position: fixed; bottom: 130px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); color: white; padding: 14px 28px; border-radius: 24px; font-size: 14px; z-index: 4000; display: none; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="pb-32">
+
+    <!-- Lock Screen -->
+    <div id="lock-screen" class="lock-screen hidden">
+        <div class="text-center space-y-8">
+            <div class="w-20 h-20 bg-primary rounded-[2rem] flex items-center justify-center text-white text-3xl mx-auto shadow-2xl">M&M</div>
+            <h2 id="lock-title" class="text-xl font-bold dark:text-white tracking-tight">הזן קוד גישה</h2>
+            <div id="pin-dots" class="flex justify-center gap-4">
+                <div class="w-4 h-4 rounded-full border-2 border-primary"></div>
+                <div class="w-4 h-4 rounded-full border-2 border-primary"></div>
+                <div class="w-4 h-4 rounded-full border-2 border-primary"></div>
+                <div class="w-4 h-4 rounded-full border-2 border-primary"></div>
+            </div>
+            <div class="grid grid-cols-3 gap-6">
+                <div class="keypad-btn" onclick="pressKey('1')">1</div>
+                <div class="keypad-btn" onclick="pressKey('2')">2</div>
+                <div class="keypad-btn" onclick="pressKey('3')">3</div>
+                <div class="keypad-btn" onclick="pressKey('4')">4</div>
+                <div class="keypad-btn" onclick="pressKey('5')">5</div>
+                <div class="keypad-btn" onclick="pressKey('6')">6</div>
+                <div class="keypad-btn" onclick="pressKey('7')">7</div>
+                <div class="keypad-btn" onclick="pressKey('8')">8</div>
+                <div class="keypad-btn" onclick="pressKey('9')">9</div>
+                <div></div>
+                <div class="keypad-btn" onclick="pressKey('0')">0</div>
+                <div class="keypad-btn text-rose-500" onclick="clearPin()">✕</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="sticky top-0 z-50 bg-white/80 dark:bg-black/80 backdrop-blur-2xl p-5 flex justify-between items-center border-b dark:border-zinc-900">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-primary rounded-2xl flex items-center justify-center text-white text-xs font-bold shadow-xl">M&M</div>
+            <div>
+                <h1 class="text-lg font-bold leading-tight dark:text-white tracking-tighter">M&M <span class="text-primary">Ultimate V3</span></h1>
+                <p id="stats-text" class="text-[9px] font-bold opacity-40 uppercase tracking-widest dark:text-gray-400">AI POWERED</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-1">
+            <button id="select-btn" onclick="toggleSelectMode()" class="px-4 py-2 text-xs font-bold text-primary hover:bg-primary/10 rounded-xl transition-all">בחר</button>
+            <button onclick="changeGrid()" class="p-2.5 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full dark:text-white">🔳</button>
+            <button onclick="toggleDarkMode()" class="p-2.5 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full dark:text-white">🌓</button>
+            <button onclick="syncFromCloud()" id="sync-btn" class="p-2.5 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full dark:text-white">🔄</button>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto">
+        
+        <!-- Tab: Dashboard -->
+        <div id="dashboard-tab" class="tab-content active p-6 space-y-8">
+            <div class="bg-primary p-8 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden">
+                <p class="text-xs font-bold opacity-70 uppercase tracking-widest mb-2">נפח אחסון בענן</p>
+                <h2 class="text-4xl font-bold mb-6" id="dash-total-size">0.0 MB</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div onclick="showTab('photos'); setFilter('fav')" class="p-5 bg-white/10 rounded-3xl cursor-pointer">
+                        <span class="text-2xl mb-2 block">⭐️</span>
+                        <p class="font-bold text-sm">מועדפים</p>
+                    </div>
+                    <div onclick="showTab('photos'); setFilter('secure')" class="p-5 bg-white/10 rounded-3xl cursor-pointer">
+                        <span class="text-2xl mb-2 block">🔒</span>
+                        <p class="font-bold text-sm">כספת</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Photos -->
+        <div id="photos-tab" class="tab-content">
+            <div class="p-5 space-y-5">
+                <div class="relative group">
+                    <span class="absolute right-4 top-1/2 -translate-y-1/2 opacity-30">🔍</span>
+                    <input type="text" id="search-input" oninput="renderGallery()" placeholder="חפש: 'כלב', 'ים', 'טקסט'..." class="w-full p-4 pr-11 bg-gray-100 dark:bg-zinc-900 rounded-2xl outline-none text-sm dark:text-white focus:ring-2 focus:ring-primary transition-all">
+                </div>
+                <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                    <button onclick="setFilter('all')" class="filter-btn active px-6 py-2.5 rounded-2xl bg-gray-100 dark:bg-zinc-800 text-xs font-bold whitespace-nowrap dark:text-white">הכל</button>
+                    <button onclick="setFilter('fav')" class="filter-btn px-6 py-2.5 rounded-2xl bg-fav/10 text-fav text-xs font-bold whitespace-nowrap">⭐️ מועדפים</button>
+                    <button onclick="setFilter('secure')" class="filter-btn px-6 py-2.5 rounded-2xl bg-secure/10 text-secure text-xs font-bold whitespace-nowrap">🔒 כספת</button>
+                    <button onclick="setFilter('image')" class="filter-btn px-6 py-2.5 rounded-2xl bg-gray-100 dark:bg-zinc-800 text-xs font-bold whitespace-nowrap dark:text-white">📸 תמונות</button>
+                    <button onclick="setFilter('video')" class="filter-btn px-6 py-2.5 rounded-2xl bg-gray-100 dark:bg-zinc-800 text-xs font-bold whitespace-nowrap dark:text-white">🎥 סרטונים</button>
+                    <button onclick="setFilter('doc')" class="filter-btn px-6 py-2.5 rounded-2xl bg-gray-100 dark:bg-zinc-800 text-xs font-bold whitespace-nowrap dark:text-white">📄 מסמכים</button>
+                </div>
+            </div>
+            <div id="gallery-grid" class="media-grid" style="grid-template-columns: repeat(3, 1fr);"></div>
+        </div>
+
+        <!-- Tab: Settings -->
+        <div id="settings-tab" class="tab-content p-6 space-y-8">
+            <div class="space-y-6">
+                <h2 class="text-2xl font-bold dark:text-white">הגדרות</h2>
+                <div class="space-y-4">
+                    <div class="p-5 bg-gray-50 dark:bg-zinc-900 rounded-[2rem] space-y-4">
+                        <p class="text-xs font-bold opacity-40 uppercase tracking-widest dark:text-white">Gemini AI Key (חינמי)</p>
+                        <input type="password" id="gemini-key" placeholder="הכנס API Key לחיפוש חכם" class="w-full p-4 bg-white dark:bg-black rounded-2xl outline-none dark:text-white">
+                    </div>
+                    <input type="password" id="set-pin" maxlength="4" placeholder="קוד PIN (4 ספרות)" class="w-full p-4 bg-gray-100 dark:bg-zinc-900 rounded-xl outline-none dark:text-white">
+                    <input type="password" id="bot-token" placeholder="Bot Token" class="w-full p-4 bg-gray-100 dark:bg-zinc-900 rounded-xl outline-none dark:text-white">
+                    <input type="text" id="chat-id" placeholder="Chat ID" class="w-full p-4 bg-gray-100 dark:bg-zinc-900 rounded-xl outline-none dark:text-white">
+                    <button id="save-settings" class="w-full py-5 bg-primary text-white rounded-[2rem] font-bold shadow-xl">שמור הכל</button>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <button onclick="exportData()" class="py-4 bg-gray-100 dark:bg-zinc-900 rounded-2xl font-bold text-xs dark:text-white flex items-center justify-center gap-2">📤 ייצוא גיבוי</button>
+                <label class="py-4 bg-gray-100 dark:bg-zinc-900 rounded-2xl font-bold text-xs dark:text-white text-center cursor-pointer flex items-center justify-center gap-2">
+                    📥 ייבוא גיבוי
+                    <input type="file" id="import-input" accept=".json" class="hidden" onchange="importData(event)">
+                </label>
+            </div>
+        </div>
+    </main>
+
+    <!-- Bulk Bar -->
+    <div id="bulk-bar" class="floating-bar">
+        <button onclick="bulkAction('lock')" class="font-bold text-xs flex items-center gap-2">🔒 נעל</button>
+        <div class="w-[1px] h-5 bg-white/30"></div>
+        <button onclick="bulkAction('delete')" class="font-bold text-xs flex items-center gap-2 text-rose-300">🗑️ מחק</button>
+        <div class="w-[1px] h-5 bg-white/30"></div>
+        <button onclick="cancelSelect()" class="font-bold text-xs opacity-70">ביטול</button>
+    </div>
+
+    <!-- Floating Upload -->
+    <label class="fixed bottom-28 left-8 w-16 h-16 bg-primary text-white rounded-[2rem] flex items-center justify-center shadow-2xl z-40 active:scale-90 transition-all cursor-pointer">
+        <span class="text-3xl">＋</span>
+        <input type="file" id="file-input" multiple class="hidden">
+    </label>
+
+    <div id="toast" class="toast"></div>
+
+    <!-- Bottom Nav -->
+    <nav class="fixed bottom-0 left-0 w-full bg-white/90 dark:bg-black/90 backdrop-blur-3xl border-t dark:border-zinc-900 p-4 flex justify-around items-center z-50">
+        <button onclick="showTab('dashboard')" class="nav-btn active-tab flex flex-col items-center gap-1 flex-1 py-1">
+            <span class="text-2xl">🏠</span>
+            <span class="text-[10px] font-bold">ראשי</span>
+        </button>
+        <button onclick="showTab('photos')" class="nav-btn flex flex-col items-center gap-1 flex-1 py-1">
+            <span class="text-2xl">🖼️</span>
+            <span class="text-[10px] font-bold">גלריה</span>
+        </button>
+        <button onclick="showTab('settings')" class="nav-btn flex flex-col items-center gap-1 flex-1 py-1">
+            <span class="text-2xl">⚙️</span>
+            <span class="text-[10px] font-bold">הגדרות</span>
+        </button>
+    </nav>
+
+    <script type="module">
+        import { GoogleGenAI } from "@google/genai";
+        import PhotoSwipeLightbox from "photoswipe-lightbox";
+        import PhotoSwipe from "photoswipe";
+
+        let backups = JSON.parse(localStorage.getItem('mm_v3_backups') || '[]');
+        let settings = JSON.parse(localStorage.getItem('mm_v3_settings') || '{"token":"","chatId":"","dark":false,"pin":"","gemini":""}');
+        let selectMode = false;
+        let selectedIds = new Set();
+        let currentFilter = 'all';
+        let gridCols = 3;
+        let currentPin = "";
+        let isVaultUnlocked = false;
+        let lightbox;
+
+        // --- Core Functions ---
+        window.pressKey = (num) => {
+            if(currentPin.length < 4) {
+                currentPin += num;
+                updatePinDots();
+                if(currentPin.length === 4) {
+                    if(currentPin === settings.pin) {
+                        if(currentFilter === 'secure') isVaultUnlocked = true;
+                        document.getElementById('lock-screen').classList.add('hidden');
+                        showToast("גישה אושרה");
+                        currentPin = "";
+                        updatePinDots();
+                        if(currentFilter === 'secure') renderGallery();
+                    } else {
+                        showToast("קוד שגוי");
+                        clearPin();
+                    }
+                }
+            }
+        };
+
+        window.clearPin = () => { currentPin = ""; updatePinDots(); };
+        function updatePinDots() {
+            const dots = document.getElementById('pin-dots').children;
+            for(let i=0; i<4; i++) dots[i].style.background = i < currentPin.length ? '#1a73e8' : 'transparent';
+        }
+
+        window.showToast = (msg) => {
+            const t = document.getElementById('toast');
+            t.innerText = msg;
+            t.style.display = 'block';
+            setTimeout(() => t.style.display = 'none', 3000);
+        };
+
+        window.toggleDarkMode = () => {
+            settings.dark = !settings.dark;
+            document.documentElement.classList.toggle('dark');
+            saveToLocal();
+        };
+
+        window.showTab = (tabId) => {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active-tab'));
+            document.getElementById(tabId + '-tab').classList.add('active');
+            const btn = Array.from(document.querySelectorAll('.nav-btn')).find(b => b.getAttribute('onclick').includes(tabId));
+            if(btn) btn.classList.add('active-tab');
+            if(tabId === 'dashboard') updateDashboard();
+        };
+
+        window.changeGrid = () => {
+            gridCols = gridCols >= 5 ? 2 : gridCols + 1;
+            document.getElementById('gallery-grid').style.gridTemplateColumns = `repeat(${gridCols}, 1fr)`;
+        };
+
+        window.toggleSelectMode = () => {
+            selectMode = !selectMode;
+            selectedIds.clear();
+            document.getElementById('select-btn').innerText = selectMode ? 'ביטול' : 'בחר';
+            document.getElementById('bulk-bar').classList.toggle('active', selectMode && selectedIds.size > 0);
+            renderGallery();
+        };
+
+        window.cancelSelect = () => {
+            selectMode = false;
+            selectedIds.clear();
+            document.getElementById('select-btn').innerText = 'בחר';
+            document.getElementById('bulk-bar').classList.remove('active');
+            renderGallery();
+        };
+
+        window.setFilter = (cat) => {
+            if(cat === 'secure' && !isVaultUnlocked && settings.pin) {
+                currentFilter = 'secure';
+                document.getElementById('lock-title').innerText = "הזן קוד לכספת";
+                document.getElementById('lock-screen').classList.remove('hidden');
+                return;
+            }
+            currentFilter = cat;
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            const btn = Array.from(document.querySelectorAll('.filter-btn')).find(b => b.getAttribute('onclick').includes(cat));
+            if(btn) btn.classList.add('active');
+            renderGallery();
+        };
+
+        document.getElementById('save-settings').onclick = () => {
+            settings.token = document.getElementById('bot-token').value;
+            settings.chatId = document.getElementById('chat-id').value;
+            settings.pin = document.getElementById('set-pin').value;
+            settings.gemini = document.getElementById('gemini-key').value;
+            saveToLocal();
+            showToast("הגדרות נשמרו");
+            renderGallery();
+        };
+
+        // --- PhotoSwipe Full Screen & Video Support ---
+        function initLightbox() {
+            if(lightbox) lightbox.destroy();
+            lightbox = new PhotoSwipeLightbox({
+                gallery: '#gallery-grid',
+                children: 'a',
+                pswpModule: PhotoSwipe,
+                padding: { top: 0, bottom: 0, left: 0, right: 0 }, // Full screen feel
+                showHideAnimationType: 'zoom',
+                initialZoomLevel: 'fit',
+                secondaryZoomLevel: 1.5,
+                maxZoomLevel: 3,
+                wheelToZoom: true,
+                bgOpacity: 0.95,
+                allowPanToNext: true,
+                loop: true
+            });
+
+            // Handle Video Content
+            lightbox.addFilter('itemData', (itemData, index) => {
+                const type = itemData.element.dataset.type;
+                if (type === 'video') {
+                    itemData.type = 'html';
+                    itemData.html = `
+                        <div class="pswp__video-container">
+                            <video src="${itemData.element.href}" controls autoplay playsinline loop></video>
+                        </div>
+                    `;
+                }
+                return itemData;
+            });
+
+            lightbox.on('uiRegister', function() {
+                // Delete Button
+                lightbox.pswp.ui.registerElement({
+                    name: 'del-btn',
+                    order: 9,
+                    isButton: true,
+                    tagName: 'button',
+                    html: '🗑️',
+                    onClick: async (event, el, pswp) => {
+                        if(confirm('למחוק לצמיתות גם מטלגרם?')) {
+                            const item = backups.find(b => b.file_id === pswp.currSlide.data.element.dataset.file_id);
+                            if(item) {
+                                await fetch(`https://api.telegram.org/bot${settings.token}/deleteMessage?chat_id=${settings.chatId}&message_id=${item.message_id}`);
+                                backups = backups.filter(b => b.id !== item.id);
+                                saveToLocal();
+                                pswp.close();
+                                renderGallery();
+                                showToast("נמחק");
+                            }
+                        }
+                    }
+                });
+
+                // Favorite Button
+                lightbox.pswp.ui.registerElement({
+                    name: 'fav-btn',
+                    order: 8,
+                    isButton: true,
+                    tagName: 'button',
+                    html: '⭐️',
+                    onInit: (el, pswp) => {
+                        pswp.on('change', () => {
+                            const item = backups.find(b => b.file_id === pswp.currSlide.data.element.dataset.file_id);
+                            el.style.color = item?.isFavorite ? '#f59e0b' : 'white';
+                        });
+                    },
+                    onClick: (event, el, pswp) => {
+                        const item = backups.find(b => b.file_id === pswp.currSlide.data.element.dataset.file_id);
+                        if(item) {
+                            item.isFavorite = !item.isFavorite;
+                            saveToLocal();
+                            el.style.color = item.isFavorite ? '#f59e0b' : 'white';
+                            showToast(item.isFavorite ? "נוסף למועדפים" : "הוסר ממועדפים");
+                        }
+                    }
+                });
+            });
+
+            lightbox.init();
+        }
+
+        // --- Gallery Logic ---
+        window.renderGallery = async () => {
+            const grid = document.getElementById('gallery-grid');
+            const search = document.getElementById('search-input').value.toLowerCase();
+            grid.innerHTML = '';
+            
+            const filtered = backups.filter(b => {
+                const matchesSearch = b.filename.toLowerCase().includes(search) || (b.tags && b.tags.toLowerCase().includes(search));
+                if(currentFilter === 'secure') return b.isSecure && matchesSearch;
+                if(currentFilter === 'fav') return b.isFavorite && !b.isSecure && matchesSearch;
+                if(b.isSecure) return false;
+                if(currentFilter === 'all') return matchesSearch;
+                return b.type === currentFilter && matchesSearch;
+            });
+
+            document.getElementById('stats-text').innerText = `${filtered.length} פריטים`;
+
+            for(const b of filtered) {
+                const item = document.createElement('div');
+                item.className = `media-item ${selectedIds.has(b.id.toString()) ? 'selected' : ''}`;
+                
+                if(selectMode) {
+                    item.onclick = () => {
+                        const idStr = b.id.toString();
+                        if(selectedIds.has(idStr)) selectedIds.delete(idStr);
+                        else selectedIds.add(idStr);
+                        document.getElementById('bulk-bar').classList.toggle('active', selectedIds.size > 0);
+                        renderGallery();
+                    };
+                }
+
+                item.innerHTML = `<div class="selection-check">✓</div><div class="flex items-center justify-center h-full opacity-10 text-[8px] font-bold dark:text-white">טוען...</div>`;
+                
+                fetch(`https://api.telegram.org/bot${settings.token}/getFile?file_id=${b.file_id}`)
+                    .then(r => r.json())
+                    .then(info => {
+                        if(info.ok) {
+                            const url = `https://api.telegram.org/file/bot${settings.token}/${info.result.file_path}`;
+                            const link = document.createElement('a');
+                            link.href = url;
+                            // Set high resolution for full screen
+                            link.dataset.pswpWidth = 2500; 
+                            link.dataset.pswpHeight = 2500;
+                            link.dataset.file_id = b.file_id;
+                            link.dataset.type = b.type;
+                            link.setAttribute('referrerpolicy', 'no-referrer');
+                            
+                            if(b.type === 'image') {
+                                link.innerHTML = `<img src="${url}" referrerpolicy="no-referrer" loading="lazy">`;
+                            } else if(b.type === 'video') {
+                                link.innerHTML = `<video src="${url}#t=0.1" referrerpolicy="no-referrer"></video><div class="absolute inset-0 flex items-center justify-center bg-black/10 text-white text-xl">▶</div>`;
+                            } else {
+                                link.innerHTML = `<div class="flex items-center justify-center h-full text-3xl">📄</div>`;
+                            }
+                            
+                            if(!selectMode) {
+                                item.innerHTML = '';
+                                item.appendChild(link);
+                                if(b.isFavorite) item.innerHTML += '<div class="absolute bottom-2 left-2 text-fav z-10 text-xs">⭐️</div>';
+                            } else {
+                                item.innerHTML = `<div class="selection-check">✓</div>` + link.innerHTML;
+                            }
+                        }
+                    });
+                grid.appendChild(item);
+            }
+            if(!selectMode) setTimeout(initLightbox, 100);
+        };
+
+        window.updateDashboard = () => {
+            let totalSize = 0;
+            backups.forEach(b => totalSize += parseFloat(b.size));
+            document.getElementById('dash-total-size').innerText = `${totalSize.toFixed(1)} MB`;
+        };
+
+        window.syncFromCloud = async () => {
+            if(!settings.token) return showToast("הכנס טוקן");
+            const btn = document.getElementById('sync-btn');
+            btn.classList.add('animate-spin');
+            try {
+                const res = await fetch(`https://api.telegram.org/bot${settings.token}/getUpdates?limit=100`);
+                const data = await res.json();
+                if(data.ok) {
+                    let added = 0;
+                    for(const update of data.result) {
+                        const msg = update.message || update.channel_post;
+                        if(!msg || msg.chat.id.toString() !== settings.chatId.toString()) continue;
+                        const doc = msg.document || msg.video || (msg.photo ? msg.photo[msg.photo.length-1] : null);
+                        if(!doc || backups.some(b => b.file_id === doc.file_id)) continue;
+
+                        let category = 'doc';
+                        const mime = doc.mime_type || "";
+                        if(msg.photo) category = 'image';
+                        else if(msg.video || mime.includes('video')) category = 'video';
+                        else if(mime.includes('pdf') || mime.includes('word') || mime.includes('excel') || mime.includes('text')) category = 'doc';
+
+                        backups.unshift({
+                            id: Date.now() + Math.random(),
+                            filename: doc.file_name || `Cloud_${category}_${Date.now()}`,
+                            file_id: doc.file_id,
+                            message_id: msg.message_id,
+                            type: category,
+                            size: (doc.file_size / 1024 / 1024).toFixed(2),
+                            isSecure: false,
+                            isFavorite: false,
+                            tags: ""
+                        });
+                        added++;
+                    }
+                    saveToLocal();
+                    renderGallery();
+                    updateDashboard();
+                    showToast(added > 0 ? `נוספו ${added} פריטים` : "הכל מעודכן");
+                }
+            } catch(e) {}
+            btn.classList.remove('animate-spin');
+        };
+
+        document.getElementById('file-input').onchange = async (e) => {
+            const files = e.target.files;
+            if(!files.length || !settings.token) return;
+            showToast(`מעלה ${files.length} קבצים...`);
+            for(let file of files) {
+                const fd = new FormData();
+                fd.append('chat_id', settings.chatId);
+                fd.append('document', file);
+                try {
+                    const res = await fetch(`https://api.telegram.org/bot${settings.token}/sendDocument`, { method: 'POST', body: fd });
+                    const data = await res.json();
+                    if(data.ok) {
+                        const doc = data.result.document || data.result.video || data.result.photo?.[0];
+                        let category = 'doc';
+                        if(file.type.includes('image')) category = 'image';
+                        else if(file.type.includes('video')) category = 'video';
+                        
+                        backups.unshift({
+                            id: Date.now() + Math.random(),
+                            filename: file.name,
+                            file_id: doc.file_id,
+                            message_id: data.result.message_id,
+                            type: category,
+                            size: (file.size / 1024 / 1024).toFixed(2),
+                            isSecure: false,
+                            isFavorite: false,
+                            tags: ""
+                        });
+                        saveToLocal();
+                    }
+                } catch(e) {}
+            }
+            renderGallery();
+            updateDashboard();
+            showToast("העלאה הושלמה");
+        };
+
+        window.bulkAction = async (type) => {
+            if(type === 'delete' && !confirm(`למחוק ${selectedIds.size} פריטים גם מטלגרם?`)) return;
+            for(let id of selectedIds) {
+                const item = backups.find(b => b.id.toString() === id);
+                if(item) {
+                    if(type === 'lock') item.isSecure = !item.isSecure;
+                    if(type === 'delete') {
+                        await fetch(`https://api.telegram.org/bot${settings.token}/deleteMessage?chat_id=${settings.chatId}&message_id=${item.message_id}`);
+                        backups = backups.filter(b => b.id.toString() !== id);
+                    }
+                }
+            }
+            saveToLocal();
+            cancelSelect();
+            renderGallery();
+            updateDashboard();
+            showToast("פעולה הושלמה");
+        };
+
+        function saveToLocal() {
+            localStorage.setItem('mm_v3_backups', JSON.stringify(backups));
+            localStorage.setItem('mm_v3_settings', JSON.stringify(settings));
+        }
+
+        window.exportData = () => {
+            const blob = new Blob([JSON.stringify({backups, settings})], {type: 'application/json'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `MM_Backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            showToast("גיבוי יוצא");
+        };
+
+        window.importData = (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (data.backups && data.settings) {
+                        if (confirm("לייבא נתונים? זה יחליף הכל.")) {
+                            backups = data.backups;
+                            settings = data.settings;
+                            saveToLocal();
+                            location.reload();
+                        }
+                    } else { showToast("קובץ לא תקין"); }
+                } catch (err) { showToast("שגיאה בקריאה"); }
+            };
+            reader.readAsText(file);
+        };
+
+        // Init
+        if(settings.dark) document.documentElement.classList.add('dark');
+        document.getElementById('bot-token').value = settings.token;
+        document.getElementById('chat-id').value = settings.chatId;
+        document.getElementById('set-pin').value = settings.pin;
+        document.getElementById('gemini-key').value = settings.gemini;
+        if(settings.pin) document.getElementById('lock-screen').classList.remove('hidden');
+        renderGallery();
+        updateDashboard();
+    </script>
+</body>
+</html>
